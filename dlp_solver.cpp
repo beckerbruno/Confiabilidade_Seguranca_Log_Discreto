@@ -23,8 +23,18 @@
 #include <cmath>
 #include <gmpxx.h>
 #include <iomanip>
+#include <csignal>
 
 using namespace std;
+
+// ============================================================================
+// VARIAVEIS GLOBAIS PARA SALVAMENTO INCREMENTAL
+// ============================================================================
+
+string g_outputFile = "solucao.txt";
+mutex g_fileMutex;
+atomic<bool> g_running{true};
+vector<int> g_completed; // 0 = nao salvo, 1 = salvo. Acesso protegido por g_fileMutex
 
 // ============================================================================
 // CONFIGURACOES
@@ -656,6 +666,58 @@ void writeSolutions(const string& filename, const vector<Solution>& solutions) {
     file.close();
 }
 
+// Salvar uma solucao individual imediatamente (append mode)
+void appendSolution(const string& filename, const Solution& sol, size_t index) {
+    lock_guard<mutex> lock(g_fileMutex);
+    
+    // Verificar se ja foi salvo
+    if (g_completed.size() > index && g_completed[index]) {
+        return; // Ja foi salvo
+    }
+    
+    ofstream file(filename, ios::app);
+    if (!file.is_open()) {
+        cerr << "[ERRO] Nao foi possivel abrir " << filename << " para append" << endl;
+        return;
+    }
+    
+    // Simplificacao: sempre escrevemos no final
+    if (sol.solved) {
+        file << "[C" << sol.id << "] " << sol.K_ab << endl;
+    } else {
+        file << "[C" << sol.id << "] # Timeout ou erro: " << sol.error << endl;
+    }
+    file.close();
+    
+    // Marcar como salvo
+    if (g_completed.size() > index) {
+        g_completed[index] = 1;
+    }
+}
+
+// Inicializar arquivo com placeholders
+void initSolutionFile(const string& filename, size_t numChallenges) {
+    lock_guard<mutex> lock(g_fileMutex);
+    
+    // Criar/sobrescrever arquivo
+    ofstream file(filename);
+    if (!file.is_open()) {
+        cerr << "Erro: Nao foi possivel criar " << filename << endl;
+        return;
+    }
+    
+    // Escrever header
+    file << "# DLP Solver - Solucoes" << endl;
+    file << "# Gerado em: " << chrono::system_clock::now().time_since_epoch().count() << endl;
+    file << "# Total de desafios: " << numChallenges << endl;
+    file << "#" << endl;
+    
+    // Inicializar vetor de controle (0 = nao salvo)
+    g_completed.resize(numChallenges, 0);
+    
+    file.close();
+}
+
 // ============================================================================
 // PARALELISMO
 // ============================================================================
@@ -664,7 +726,7 @@ void workerThread(const vector<Challenge>& challenges, vector<Solution>& solutio
                   atomic<size_t>& nextIndex, mutex& solutionsMutex) {
     DLPSolver solver;
     
-    while (true) {
+    while (g_running) {
         size_t idx = nextIndex.fetch_add(1);
         if (idx >= challenges.size()) break;
         
@@ -688,16 +750,24 @@ void workerThread(const vector<Challenge>& challenges, vector<Solution>& solutio
             sol.K_ab = K_ab;
             cout << "[Thread " << this_thread::get_id() << "] C" 
                  << ch.id << " RESOLVIDO em " << fixed << setprecision(3) 
-                 << sol.timeSeconds << "s - K_ab = " << K_ab << endl;
+                 << sol.timeSeconds << "s" << endl;
         } else {
-            sol.error = "Timeout apos " + to_string(sol.timeSeconds) + "s";
+            sol.error = "Timeout apos " + to_string(static_cast<int>(sol.timeSeconds)) + "s";
             cout << "[Thread " << this_thread::get_id() << "] C" 
                  << ch.id << " TIMEOUT apos " << fixed << setprecision(3) 
                  << sol.timeSeconds << "s" << endl;
         }
         
-        lock_guard<mutex> lock(solutionsMutex);
-        solutions[idx] = sol;
+        // Salvar no vetor
+        {
+            lock_guard<mutex> lock(solutionsMutex);
+            solutions[idx] = sol;
+        }
+        
+        // Salvar imediatamente no arquivo (incremental)
+        if (g_running) {
+            appendSolution(g_outputFile, sol, idx);
+        }
     }
 }
 
@@ -705,12 +775,29 @@ void workerThread(const vector<Challenge>& challenges, vector<Solution>& solutio
 // MAIN
 // ============================================================================
 
+// Handler para SIGINT (Ctrl+C)
+void signalHandler(int signum) {
+    cout << endl << "[AVISO] Interrupcao recebida (Ctrl+C). Encerrando..." << endl;
+    g_running = false;
+    // Dar tempo para threads salvarem
+    this_thread::sleep_for(chrono::milliseconds(500));
+    exit(signum);
+}
+
 int main(int argc, char* argv[]) {
+    // Registrar handler de sinal
+    signal(SIGINT, signalHandler);
+    #ifdef SIGTERM
+    signal(SIGTERM, signalHandler);
+    #endif
+    
     string inputFile = "desafios.txt";
     string outputFile = "solucao.txt";
     
     if (argc > 1) inputFile = argv[1];
     if (argc > 2) outputFile = argv[2];
+    
+    g_outputFile = outputFile; // Global para threads
     
     cout << "========================================" << endl;
     cout << "DLP Solver - Pohlig-Hellman Optimizado" << endl;
@@ -734,6 +821,9 @@ int main(int argc, char* argv[]) {
         cout << "  C" << ch.id << ": " << ch.bits << " bits" << endl;
     }
     cout << endl;
+    
+    // Inicializar arquivo de solucoes (modo incremental)
+    initSolutionFile(outputFile, challenges.size());
     
     // Preparar estruturas para paralelismo
     vector<Solution> solutions(challenges.size());
@@ -787,9 +877,23 @@ int main(int argc, char* argv[]) {
         cout << endl;
     }
     
-    // Salvar solucoes
-    writeSolutions(outputFile, solutions);
+    // Salvar solucoes pendentes (caso alguma nao tenha sido salva)
+    cout << endl << "Salvando solucoes pendentes..." << endl;
+    for (size_t i = 0; i < solutions.size(); ++i) {
+        bool alreadySaved = false;
+        {
+            lock_guard<mutex> lock(g_fileMutex);
+            if (i < g_completed.size() && g_completed[i]) {
+                alreadySaved = true;
+            }
+        }
+        if (!alreadySaved) {
+            appendSolution(outputFile, solutions[i], i);
+        }
+    }
+    
     cout << endl << "Solucoes salvas em: " << outputFile << endl;
+    cout << "(Arquivo salvo incrementalmente durante execucao)" << endl;
     
     return 0;
 }
