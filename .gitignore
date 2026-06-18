@@ -1,0 +1,84 @@
+# C++ Build Artifacts
+*.exe
+*.out
+*.o
+*.obj
+*.a
+*.lib
+*.dll
+*.so
+*.dylib
+
+# Executables
+dlp_solver
+dlp_solver_v2
+!dlp_solver.cpp
+!dlp_solver_v2.cpp
+
+# IDEs
+.vscode/
+.idea/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.suo
+*.user
+*.cache
+
+# Boost
+boost/
+boost-*/
+boost*.zip
+boost*.7z
+boost*.tar.gz
+
+# Output files
+solucao.txt
+solucao_v2.txt
+test_input.txt
+test_output.txt
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Build directories
+build/
+cmake-build-*/
+Debug/
+Release/
+x64/
+x86/
+
+# Prerequisites
+*.d
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Debug files
+*.pdb
+*.ilk
+*.exp
+
+# Makefile artifacts
+.dlp_solver
+.dlp_solver_v2
