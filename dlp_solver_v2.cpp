@@ -29,6 +29,7 @@
 #include <iomanip>
 #include <queue>
 #include <functional>
+#include <csignal>
 
 namespace mp = boost::multiprecision;
 using BigInt = mp::cpp_int;
@@ -43,6 +44,15 @@ const int MAX_THREADS = static_cast<int>(thread::hardware_concurrency());
 const int TIMEOUT_SECONDS = 3600;
 const size_t BSGS_THRESHOLD = 10000000;      // 10M - BSGS ate aqui
 const size_t POLLARD_THRESHOLD = 1000000000; // 1B - Pollard's Rho ate aqui
+
+// ============================================================================
+// VARIAVEIS GLOBAIS PARA SALVAMENTO INCREMENTAL
+// ============================================================================
+
+string g_outputFile = "solucao_v2.txt";
+mutex g_fileMutex;
+atomic<bool> g_running{true};
+vector<int> g_completed;
 
 // ============================================================================
 // UTILITARIOS
@@ -601,21 +611,36 @@ vector<Challenge> parseChallenges(const string& filename) {
     return challenges;
 }
 
-void writeSolutions(const string& filename, const vector<Solution>& solutions) {
+void initSolutionFile(const string& filename, size_t numChallenges) {
+    lock_guard<mutex> lock(g_fileMutex);
     ofstream file(filename);
     if (!file.is_open()) {
         cerr << "Erro: Nao foi possivel criar " << filename << endl;
         return;
     }
-    
-    for (const auto& sol : solutions) {
-        if (sol.solved) {
-            file << sol.K_ab << endl;
-        } else {
-            file << "# Timeout ou erro: " << sol.error << endl;
-        }
+    file << "# DLP Solver v2 - Solucoes" << endl;
+    file << "# Gerado em: " << chrono::system_clock::now().time_since_epoch().count() << endl;
+    file << "# Total de desafios: " << numChallenges << endl;
+    file << "#" << endl;
+    g_completed.resize(numChallenges, 0);
+    file.close();
+}
+
+void appendSolution(const string& filename, const Solution& sol, size_t index) {
+    lock_guard<mutex> lock(g_fileMutex);
+    if (g_completed.size() > index && g_completed[index]) return;
+    ofstream file(filename, ios::app);
+    if (!file.is_open()) {
+        cerr << "[ERRO] Nao foi possivel abrir " << filename << " para append" << endl;
+        return;
+    }
+    if (sol.solved) {
+        file << "[C" << sol.id << "] " << sol.K_ab << endl;
+    } else {
+        file << "[C" << sol.id << "] # Timeout ou erro: " << sol.error << endl;
     }
     file.close();
+    if (g_completed.size() > index) g_completed[index] = 1;
 }
 
 // ============================================================================
@@ -626,7 +651,7 @@ void workerThread(const vector<Challenge>& challenges, vector<Solution>& solutio
                   atomic<size_t>& nextIndex, mutex& solutionsMutex) {
     DLPSolver solver;
     
-    while (true) {
+    while (g_running) {
         size_t idx = nextIndex.fetch_add(1);
         if (idx >= challenges.size()) break;
         
@@ -658,8 +683,13 @@ void workerThread(const vector<Challenge>& challenges, vector<Solution>& solutio
                  << sol.timeSeconds << "s" << endl;
         }
         
-        lock_guard<mutex> lock(solutionsMutex);
-        solutions[idx] = sol;
+        {
+            lock_guard<mutex> lock(solutionsMutex);
+            solutions[idx] = sol;
+        }
+        if (g_running) {
+            appendSolution(g_outputFile, sol, idx);
+        }
     }
 }
 
@@ -667,7 +697,19 @@ void workerThread(const vector<Challenge>& challenges, vector<Solution>& solutio
 // MAIN
 // ============================================================================
 
+void signalHandler(int signum) {
+    cout << endl << "[AVISO] Interrupcao recebida (Ctrl+C). Encerrando..." << endl;
+    g_running = false;
+    this_thread::sleep_for(chrono::milliseconds(500));
+    exit(signum);
+}
+
 int main(int argc, char* argv[]) {
+    signal(SIGINT, signalHandler);
+    #ifdef SIGTERM
+    signal(SIGTERM, signalHandler);
+    #endif
+
     string inputFile = "desafios.txt";
     string outputFile = "solucao_v2.txt";
     
@@ -704,7 +746,10 @@ int main(int argc, char* argv[]) {
     int numThreads = min(MAX_THREADS, static_cast<int>(challenges.size()));
     
     cout << "Iniciando com " << numThreads << " threads..." << endl << endl;
-    
+
+    g_outputFile = outputFile;
+    initSolutionFile(outputFile, challenges.size());
+
     auto startTime = chrono::steady_clock::now();
     
     for (int i = 0; i < numThreads; ++i) {
@@ -741,7 +786,15 @@ int main(int argc, char* argv[]) {
         cout << endl;
     }
     
-    writeSolutions(outputFile, solutions);
+    cout << endl << "Salvando solucoes pendentes..." << endl;
+    for (size_t i = 0; i < solutions.size(); ++i) {
+        bool alreadySaved = false;
+        {
+            lock_guard<mutex> lock(g_fileMutex);
+            if (i < g_completed.size() && g_completed[i]) alreadySaved = true;
+        }
+        if (!alreadySaved) appendSolution(outputFile, solutions[i], i);
+    }
     cout << endl << "Solucoes: " << outputFile << endl;
     
     return 0;

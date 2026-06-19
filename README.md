@@ -1,45 +1,38 @@
-# DLP Solver - Solucao Otimizada para Logaritmo Discreto
+# DLP Solver - Solucao para Logaritmo Discreto
 
-Solucao em C++ para quebrar o Problema do Logaritmo Discreto (DLP) no contexto do protocolo Diffie-Hellman.
+Solucao em C++ para o Problema do Logaritmo Discreto (DLP) no contexto do protocolo Diffie-Hellman.
+Dado `A = alpha^a mod p` e `B = alpha^b mod p`, calcular `K_ab = B^a mod p = alpha^(ab) mod p`.
+
+Duas versoes disponiveis:
+
+| Versao | Arquivo | Biblioteca | Saida |
+|--------|---------|------------|-------|
+| **v1** | `dlp_solver.cpp` | GMP | `solucao.txt` |
+| **v2** | `dlp_solver_v2.cpp` | Boost.Multiprecision | `solucao_v2.txt` |
+
+---
 
 ## Algoritmos Implementados
 
-- **Fatoracao**: Pollard's Rho + Trial Division para fatorar p-1
-- **DLP em Subgrupos**: Baby-Step Giant-Step (BSGS) para grupos pequenos
-- **DLP em Subgrupos Grandes**: Pollard's Rho para primos grandes
-- **Combinacao**: Teorema Chines do Resto (CRT)
-- **Estrategia Principal**: Pohlig-Hellman para reduzir o problema
+- **Pohlig-Hellman** — estrategia principal: decompoe o DLP em subproblemas por cada fator primo de p-1
+- **BSGS (Baby-Step Giant-Step)** — resolve subgrupos de ordem pequena em O(sqrt(n))
+- **Pollard's Rho** — resolve subgrupos maiores com O(1) de memoria
+- **Fatoracao** — Trial Division + Pollard's Rho para fatorar p-1
+- **CRT (Teorema Chines do Resto)** — combina solucoes parciais
+
+A dificuldade de cada cenario **nao depende do tamanho de p**, mas sim dos **fatores primos de p-1**:
+- Se p-1 tem apenas fatores pequenos → resolvivel rapidamente
+- Se p-1 tem um fator primo grande → pode atingir timeout
+
+---
 
 ## Requisitos
 
-- C++17 ou superior
-- Biblioteca GMP (GNU Multiple Precision Arithmetic Library)
-- Compilador g++ com suporte a threads
+### v1 — GMP
 
-### Instalacao do GMP
-
-**macOS (Homebrew):**
+**macOS:**
 ```bash
 brew install gmp
-```
-
-**Windows:**
-
-Opcao 1 - MSYS2 (Recomendado):
-1. Instale MSYS2 de https://www.msys2.org/
-2. Abra MSYS2 UCRT64 terminal
-3. Execute: `pacman -S mingw-w64-x86_64-gmp`
-4. Compile com: `make`
-
-Opcao 2 - TDM-GCC (Atual):  
-Se voce ja tem TDM-GCC instalado, precisa adicionar GMP:
-1. Baixe GMP para MinGW de: https://gmplib.org/download.html
-2. Ou instale via MSYS2 e copie os arquivos para o TDM-GCC
-
-Opcao 3 - vcpkg:
-```bash
-vcpkg install gmp
-make GMP_CFLAGS="-I$(vcpkg root)/installed/x64-windows/include" GMP_LDFLAGS="-L$(vcpkg root)/installed/x64-windows/lib -lgmp -lgmpxx"
 ```
 
 **Linux (Ubuntu/Debian):**
@@ -47,247 +40,216 @@ make GMP_CFLAGS="-I$(vcpkg root)/installed/x64-windows/include" GMP_LDFLAGS="-L$
 sudo apt-get install libgmp-dev
 ```
 
-**Fedora:**
+**Windows (MSYS2):**
 ```bash
-sudo dnf install gmp-devel
+pacman -S mingw-w64-x86_64-gmp
 ```
 
-**Arch Linux:**
+### v2 — Boost.Multiprecision (header-only)
+
+**macOS:**
 ```bash
-sudo pacman -S gmp
+brew install boost
 ```
 
-## Compilacao
-
-### macOS
+**Linux (Ubuntu/Debian):**
 ```bash
-make
+sudo apt-get install libboost-dev
 ```
 
-### Windows (MSYS2/MinGW)
+---
+
+## Compilacao e Execucao
+
+### Comandos Make
+
 ```bash
-make
+make          # Compila v1 (dlp_solver)
+make run      # Compila e executa v1 -> solucao.txt
+make run2     # Compila e executa v2 -> solucao_v2.txt
+make clean    # Remove binarios e arquivos de saida
+make test     # Testa v1 com C0 (sanity check)
+make check    # Verifica instalacao do GMP
 ```
 
-### Linux
+### Compilacao Manual
+
+**v1 (macOS):**
 ```bash
-make
-```
-
-### Compilacao Manual (com paths customizados)
-
-Se o GMP esta instalado em um local nao-padrao:
-
-```bash
-# Exemplo: GMP em /custom/path
-make GMP_CFLAGS="-I/custom/path/include" GMP_LDFLAGS="-L/custom/path/lib -lgmp -lgmpxx"
-
-# Exemplo: vcpkg no Windows
-make GMP_CFLAGS="-I$VCPKG_ROOT/installed/x64-windows/include" \
-     GMP_LDFLAGS="-L$VCPKG_ROOT/installed/x64-windows/lib -lgmp -lgmpxx"
-
-# Exemplo: MSYS2 no Windows (PowerShell)
-make GMP_CFLAGS="-I/C/msys64/mingw64/include" \
-     GMP_LDFLAGS="-L/C/msys64/mingw64/lib -lgmp -lgmpxx"
-```
-
-### Compilacao Direta (sem Makefile)
-
-```bash
-# macOS
 g++ -std=c++17 -O3 -I/opt/homebrew/include -o dlp_solver dlp_solver.cpp \
     -L/opt/homebrew/lib -lgmp -lgmpxx -pthread
+```
 
-# Linux
+**v2 (macOS):**
+```bash
+g++ -std=c++17 -O3 -I/opt/homebrew/include -o dlp_solver_v2 dlp_solver_v2.cpp -pthread
+```
+
+**v1 (Linux):**
+```bash
 g++ -std=c++17 -O3 -o dlp_solver dlp_solver.cpp -lgmp -lgmpxx -pthread
-
-# Windows MSYS2
-g++ -std=c++17 -O3 -I/mingw64/include -o dlp_solver.exe dlp_solver.cpp \
-    -L/mingw64/lib -lgmp -lgmpxx -pthread
 ```
 
-## Execucao
-
-### Padrao
+**v2 (Linux):**
 ```bash
-./dlp_solver
+g++ -std=c++17 -O3 -o dlp_solver_v2 dlp_solver_v2.cpp -pthread
 ```
 
-### Com arquivos customizados
+### Execucao com arquivos customizados
+
 ```bash
-./dlp_solver desafios.txt solucao.txt
+./dlp_solver    desafios.txt solucao.txt
+./dlp_solver_v2 desafios.txt solucao_v2.txt
 ```
 
-## Estrutura dos Arquivos
+---
 
-### Entrada (desafios.txt)
+## Formato dos Arquivos
+
+### Entrada (`desafios.txt`)
+
 ```
-[C0] bits=16
-p = 36467
+# Trabalho Pratico --- Logaritmo Discreto
+#
+[C0]  bits=16  (EXEMPLO RESOLVIDO)
+p     = 36467
 alpha = 20347
-A = 13686
-B = 8710
+A     = 13686
+B     = 8710
 
-[C1] bits=32
-p = 3008149519
+[C1]  bits=32
+p     = 3008149519
+alpha = 223722476
+A     = 1957790020
+B     = 1354383354
+```
+
+### Saida (`solucao.txt` / `solucao_v2.txt`)
+
+Cada linha corresponde a um cenario: `[Cx] <K_ab>` se resolvido, ou `[Cx] # Timeout...` se falhou.
+Os resultados sao salvos **incrementalmente** — interromper com Ctrl+C preserva o que ja foi resolvido.
+
+```
+# DLP Solver - Solucoes
+# Gerado em: 1781894338812611
+# Total de desafios: 23
+#
+[C0] 15261
+[C1] 2039871234
+[C2] # Timeout ou erro: Timeout apos 3600s
+[C3] 748291038475
 ...
 ```
 
-### Saida (solucao.txt)
-Valores de K_ab em decimal, um por linha:
-```
-15261
-<valor K_ab do C1>
-<valor K_ab do C2>
-...
-```
+> **Sanity check**: C0 tem solucao revelada — o resultado correto e `K_ab = 15261`.
 
-## Configuracoes
-
-Editar as constantes no inicio de `dlp_solver.cpp`:
-
-```cpp
-const int MAX_THREADS = thread::hardware_concurrency();
-const int TIMEOUT_SECONDS = 3600;    // Timeout por cenario (1 hora)
-const size_t BSGS_THRESHOLD = 100000000; // Limite para BSGS
-```
+---
 
 ## Funcionalidades
 
-- **Paralelismo**: Utiliza todas as threads disponiveis da CPU
-- **Timeout**: Cada cenario tem limite de tempo configuravel
-- **Progresso**: Exibe tempo gasto em cada cenario
-- **Verificacao**: Valida automaticamente as solucoes
-- **Recuperacao**: Cenarios que falham sao marcados com #
+- **Paralelismo** — usa todas as threads da CPU disponíveis
+- **Timeout** — cada cenario tem limite de 3600s (configuravel)
+- **Salvamento incremental** — cada resultado e gravado imediatamente apos ser resolvido
+- **Interrupcao segura** — Ctrl+C salva os resultados ja obtidos antes de encerrar
+- **Verificacao automatica** — valida alpha^a = A (mod p) antes de calcular K_ab
 
-## Comandos Make
+---
 
-```bash
-make              # Compilar
-make clean      # Limpar arquivos
-make run        # Compilar e executar
-make test       # Testar com C0 (exemplo)
-make check      # Verificar instalacao GMP
+## Configuracoes
+
+Editar as constantes no inicio de cada arquivo:
+
+**v1 (`dlp_solver.cpp`):**
+```cpp
+const int TIMEOUT_SECONDS = 3600;       // Timeout por cenario
+const size_t BSGS_THRESHOLD = 100000000; // Limite para BSGS (100M)
 ```
 
-## Arquitetura do Codigo
+**v2 (`dlp_solver_v2.cpp`):**
+```cpp
+const int TIMEOUT_SECONDS = 3600;
+const size_t BSGS_THRESHOLD = 10000000;      // 10M
+const size_t POLLARD_THRESHOLD = 1000000000; // 1B
+```
+
+---
+
+## Arquitetura
 
 ```
-dlp_solver.cpp
-├── Timer                      - Controle de tempo
-├── Factorizer                 - Fatoracao Pollard's Rho + Trial Division
-├── BSGSSolver                 - Baby-Step Giant-Step
-├── PollardRhoDLP              - Pollard's Rho para DLP
-├── crt()                      - Teorema Chines do Resto
-├── PohligHellmanSolver        - Algoritmo principal
-├── DLPSolver                  - Interface do solucionador
-├── parseChallenges()          - Parser de entrada
-├── workerThread()             - Thread worker
-└── main()                     - Orquestracao
+v1: dlp_solver.cpp
+├── Timer                  - Controle de tempo por cenario
+├── Factorizer             - Trial Division + Pollard's Rho para fatorar p-1
+├── BSGSSolver             - Baby-Step Giant-Step (map ordenado)
+├── PollardRhoDLP          - Pollard's Rho para DLP
+├── crt()                  - Teorema Chines do Resto
+├── PohligHellmanSolver    - Algoritmo principal de decomposicao
+├── DLPSolver              - Calcula K_ab = B^a mod p
+├── parseChallenges()      - Parser do arquivo de entrada
+├── appendSolution()       - Salvamento incremental thread-safe
+└── main()                 - Orquestracao com SIGINT handler
+
+v2: dlp_solver_v2.cpp  (mesma estrutura, bibliotecas diferentes)
+├── BigInt (Boost)         - Precisao arbitraria sem GMP
+├── BSGSSolver             - BSGS com unordered_map (hash, O(1) medio)
+├── PollardRhoSolver       - Pollard's Rho com 3 seeds diferentes
+└── (demais identicos ao v1)
 ```
+
+---
 
 ## Estrategia Algoritmica
 
-1. **Fatorar p-1** usando Pollard's Rho
-2. **Calcular a ordem** do gerador alpha
-3. **Aplicar Pohlig-Hellman** para decompor o problema
-4. **Resolver em subgrupos** usando BSGS ou Pollard's Rho
-5. **Combinar com CRT** para obter o logaritmo discreto
-6. **Calcular K_ab** = B^a mod p
-
-## Notas de Desempenho
-
-- Cenarios com p-1 tendo fatores primos grandes (> 10^8 bits) podem atingir timeout
-- A dificuldade depende da fatoracao de p-1, nao apenas do tamanho de p
-- BSGS usa O(sqrt(n)) memoria e tempo
-- Pollard's Rho usa O(1) memoria mas pode ser mais lento
-
-## Exemplo de Saida
-
 ```
-========================================
-DLP Solver - Pohlig-Hellman Optimizado
-========================================
-Threads disponiveis: 8
-Timeout por cenario: 3600s
-========================================
-
-[Thread 1234] Iniciando C1 (32 bits)...
-[Thread 5678] Iniciando C2 (32 bits)...
-[Thread 1234] C1 RESOLVIDO em 0.023s - K_ab = 123456789
-[Thread 5678] C2 RESOLVIDO em 0.045s - K_ab = 987654321
-...
-
-RESUMO
-Total de desafios: 23
-Resolvidos: 15
-Timeout: 8
-Tempo total: 1234.567s
+Para cada cenario Ci:
+  1. Fatorar p-1 = q1^e1 * q2^e2 * ... * qk^ek
+  2. Para cada fator primo qi^ei:
+       a. Reduzir ao subgrupo: alpha_i = alpha^((p-1)/qi^ei) mod p
+       b. Se qi^ei <= threshold  → BSGS
+          Se qi^ei <= 1B        → Pollard's Rho
+          Caso contrario         → Pohlig-Hellman recursivo
+  3. Combinar resultados parciais com CRT → expoente 'a'
+  4. Calcular K_ab = B^a mod p
 ```
+
+---
 
 ## Troubleshooting
 
-### Erro: `gmpxx.h: No such file or directory`
-
-O GMP nao esta instalado ou nao foi encontrado. Execute:
+### `gmpxx.h: No such file or directory`
 ```bash
-make check
+make check   # Diagnostica a instalacao do GMP
+brew install gmp   # macOS
 ```
 
-Isso mostrara onde o Makefile esta procurando o GMP.
-
-**Solucao Windows:**
-1. Instale MSYS2 de https://www.msys2.org/
-2. Abra terminal MSYS2 UCRT64
-3. Execute: `pacman -S mingw-w64-x86_64-gmp`
-4. Compile: `make`
-
-### Erro: `undefined reference to '__gmp...'`
-
-As bibliotecas GMP nao foram linkadas corretamente. Tente:
+### `boost/multiprecision/cpp_int.hpp: No such file or directory`
 ```bash
-make clean
-make GMP_LDFLAGS="-lgmp -lgmpxx"
+brew install boost   # macOS
+sudo apt-get install libboost-dev   # Linux
 ```
 
-### Erro: `cannot find -lgmp`
-
-A biblioteca GMP nao esta no path de bibliotecas. Especifique o path completo:
+### `undefined reference to '__gmp...'`
 ```bash
-make GMP_LDFLAGS="-L/caminho/para/gmp/lib -lgmp -lgmpxx"
+make clean && make
 ```
 
-### Erro: `omp.h not found` (OpenMP)
+### Todos os cenarios retornam "Timeout apos 0s"
+Verificar se o arquivo de entrada tem o formato correto com espacos nos campos (`A     = valor`).
+O parser aceita chaves com espacos antes do `=`.
 
-Se encontrar problemas com OpenMP, o codigo usa `std::thread` entao nao precisa de OpenMP. A opcao `-pthread` e suficiente.
-
-### Erro de compilacao no Windows com TDM-GCC
-
-Se voce tem TDM-GCC mas sem GMP:
-1. Baixe GMP pre-compilado para MinGW
-2. Extraia `gmp.h` e `gmpxx.h` para `C:\TDM-GCC-64\include`
-3. Extraia `libgmp.dll.a` e `libgmpxx.dll.a` para `C:\TDM-GCC-64\lib`
-4. Ou use MSYS2 que ja tem tudo configurado
+### Cenario C0 nao retorna 15261
+```bash
+make test   # Testa isoladamente com C0
+```
+Se falhar, a aritmetica modular ou o parser estao com problema.
 
 ### Programa trava em cenarios grandes
+Esperado para cenarios com fator primo grande em p-1. Aguardar timeout ou usar Ctrl+C —
+os resultados ja obtidos serao salvos automaticamente.
 
-Isso e esperado! Cenarios com p-1 tendo um fator primo muito grande (> 10^8) podem exigir muito tempo para resolver. O timeout de 1 hora protege contra isso. Para aumentar o timeout:
-```cpp
-const int TIMEOUT_SECONDS = 7200; // 2 horas
-```
-
-### Solucoes incorretas para C0
-
-C0 e um exemplo com a solucao revelada. Se o programa nao retornar `15261`, verifique:
-1. Se o parser esta lendo corretamente o arquivo
-2. Se a aritmetica modular esta correta
-3. Execute `make test` para verificar
+---
 
 ## Licenca
 
-Este codigo foi desenvolvido para fins academicos.
-Estrategias algoritmicas baseadas em:
-- Pohlig-Hellman algorithm
-- Baby-Step Giant-Step (Shanks)
-- Pollard's Rho
-- Chinese Remainder Theorem
+Desenvolvido para fins academicos — CSS 98G08-04.
+Algoritmos baseados em: Pohlig-Hellman (1978), Pollard's Rho (1978), Baby-Step Giant-Step (Shanks).
