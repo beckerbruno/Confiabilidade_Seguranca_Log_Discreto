@@ -12,6 +12,7 @@
  */
 
 #include <boost/multiprecision/cpp_int.hpp>
+#include <boost/multiprecision/miller_rabin.hpp>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -149,7 +150,7 @@ BigInt pollardsRho(const BigInt& n, const function<bool()>& timeout) {
 
 void factorRecursive(BigInt n, vector<BigInt>& factors, const function<bool()>& timeout) {
     if (n == 1) return;
-    if (mp::millier_rabin_test(n, 10)) {
+    if (mp::miller_rabin_test(n, 10)) {
         factors.push_back(n);
         return;
     }
@@ -572,6 +573,11 @@ vector<Challenge> parseChallenges(const string& filename) {
             if (eqPos != string::npos) {
                 string key = line.substr(0, eqPos);
                 string value = line.substr(eqPos + 1);
+                
+                // Trim key
+                auto kstart = key.find_first_not_of(" \t");
+                auto kend = key.find_last_not_of(" \t");
+                if (kstart != string::npos) key = key.substr(kstart, kend - kstart + 1);
                 
                 auto start = value.find_first_not_of(" \t");
                 auto end = value.find_last_not_of(" \t");

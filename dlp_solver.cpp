@@ -619,7 +619,12 @@ vector<Challenge> parseChallenges(const string& filename) {
                 string key = line.substr(0, eqPos);
                 string value = line.substr(eqPos + 1);
                 
-                // Trim
+                // Trim key
+                auto kstart = key.find_first_not_of(" \t");
+                auto kend = key.find_last_not_of(" \t");
+                if (kstart != string::npos) key = key.substr(kstart, kend - kstart + 1);
+                
+                // Trim value
                 auto start = value.find_first_not_of(" \t");
                 auto end = value.find_last_not_of(" \t");
                 if (start != string::npos) {
