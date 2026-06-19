@@ -69,12 +69,20 @@ else
             BOOST_CFLAGS =
         endif
     else
-        # Linux - GMP padrao
+        # Linux/WSL - GMP padrao
         GMP_CFLAGS = 
         GMP_LDFLAGS = -lgmp -lgmpxx
         GMP_DETECTED := 1
+
+        # Boost - tentar varios locais comuns
         ifneq (,$(wildcard /usr/include/boost/multiprecision/cpp_int.hpp))
             BOOST_CFLAGS = 
+            BOOST_DETECTED := 1
+        else ifneq (,$(wildcard /usr/local/include/boost/multiprecision/cpp_int.hpp))
+            BOOST_CFLAGS = -I/usr/local/include
+            BOOST_DETECTED := 1
+        else ifneq (,$(wildcard /opt/include/boost/multiprecision/cpp_int.hpp))
+            BOOST_CFLAGS = -I/opt/include
             BOOST_DETECTED := 1
         else
             BOOST_CFLAGS =
@@ -104,16 +112,23 @@ SRCS_V2 = dlp_solver_v2.cpp
 OBJS_V2 = $(SRCS_V2:.cpp=.o)
 CXXFLAGS_V2 = -std=c++17 -O3 -march=native -Wall -Wextra $(BOOST_CFLAGS)
 
-# Alvo padrao
-all: $(TARGET)$(EXE)
+# Alvo padrao (ambas as versoes)
+all: $(TARGET)$(EXE) $(TARGET_V2)$(EXE)
+
+# Verificar dependencias antes de compilar tudo
+all-check: check check-boost all
 
 # Compilar
 $(TARGET)$(EXE): $(OBJS)
 	$(CXX) $(OBJS) -o $@ $(LDFLAGS)
 
-# Regra de compilacao
-%.o: %.cpp
+# Regra de compilacao v1 (GMP)
+$(OBJS): %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+# Regra de compilacao v2 (Boost)
+$(OBJS_V2): %.o: %.cpp
+	$(CXX) $(CXXFLAGS_V2) -c $< -o $@
 
 # Limpar
 clean:
@@ -126,9 +141,6 @@ run: $(TARGET)$(EXE)
 # Compilar v2
 $(TARGET_V2)$(EXE): $(OBJS_V2)
 	$(CXX) $(OBJS_V2) -o $@ $(THREAD_FLAGS)
-
-$(OBJS_V2): $(SRCS_V2)
-	$(CXX) $(CXXFLAGS_V2) -c $(SRCS_V2) -o $(OBJS_V2)
 
 # Executar v2
 run2: $(TARGET_V2)$(EXE)
@@ -162,6 +174,7 @@ else
 	@echo "  MSYS2:    pacman -S mingw-w64-x86_64-gmp"
 	@echo "  Ubuntu:   sudo apt-get install libgmp-dev"
 	@echo "  Fedora:   sudo dnf install gmp-devel"
+	@echo "  Alpine:   sudo apk add gmp-dev"
 	@echo ""
 	@echo "Ou especifique manualmente:"
 	@echo "  make GMP_CFLAGS=-I/caminho/include GMP_LDFLAGS=\"-L/caminho/lib -lgmp -lgmpxx\""
@@ -171,6 +184,44 @@ endif
 	@echo "Compilador: $(CXX)"
 	$(CXX) --version
 
+# Verificar se Boost esta instalado (necessario para v2)
+check-boost:
+	@echo "=============================================="
+	@echo "Verificando instalacao do Boost..."
+	@echo "=============================================="
+ifeq ($(BOOST_DETECTED),1)
+	@echo "BOOST DETECTADO!"
+	@echo "CFLAGS: $(BOOST_CFLAGS)"
+else
+	@echo "ATENCAO: BOOST NAO DETECTADO!"
+	@echo ""
+	@echo "Para instalar Boost (somente headers para v2):"
+	@echo "  macOS:    brew install boost"
+	@echo "  MSYS2:    pacman -S mingw-w64-x86_64-boost"
+	@echo "  Ubuntu:   sudo apt-get install libboost-all-dev"
+	@echo "  Fedora:   sudo dnf install boost-devel"
+	@echo "  Alpine:   sudo apk add boost-dev"
+	@echo ""
+	@echo "Ou especifique manualmente:"
+	@echo "  make BOOST_CFLAGS=-I/caminho/do/boost"
+	@echo "=============================================="
+	@exit 1
+endif
+
+# Instalar Boost no Alpine (Docker Desktop / WSL)
+install-boost:
+	@echo "Instalando Boost via apk..."
+	apk add boost-dev
+
+# Instalar GMP no Alpine
+install-gmp-alpine:
+	@echo "Instalando GMP via apk..."
+	apk add gmp-dev
+
+# Instalar todas as dependencias no Alpine
+install-deps-alpine: install-gmp-alpine install-boost
+	@echo "Dependencias instaladas!"
+
 # Instalacao do GMP via Homebrew (macOS)
 install-gmp-mac:
 	brew install gmp
@@ -179,4 +230,4 @@ install-gmp-mac:
 install-gmp-win:
 	@echo "Execute no MSYS2: pacman -S mingw-w64-x86_64-gmp"
 
-.PHONY: all clean run run2 test check install-gmp-mac install-gmp-win
+.PHONY: all all-check clean run run2 test check check-boost install-boost install-gmp-alpine install-deps-alpine install-gmp-mac install-gmp-win
