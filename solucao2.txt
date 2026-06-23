@@ -1,0 +1,153 @@
+./dlp_solver desafios.txt solucao.txt
+========================================
+DLP Solver - Pohlig-Hellman Optimizado
+========================================
+Threads disponiveis: 10
+Timeout por cenario: 3600s
+Arquivo de entrada: desafios.txt
+Arquivo de saida: solucao.txt
+========================================
+
+Carregados 23 desafios:
+  C0: 16 bits
+  C1: 32 bits
+  C2: 32 bits
+  C3: 40 bits
+  C4: 40 bits
+  C5: 48 bits
+  C6: 48 bits
+  C7: 64 bits
+  C8: 64 bits
+  C9: 80 bits
+  C10: 80 bits
+  C11: 96 bits
+  C12: 96 bits
+  C13: 112 bits
+  C14: 112 bits
+  C15: 128 bits
+  C16: 128 bits
+  C17: 256 bits
+  C18: 256 bits
+  C19: 512 bits
+  C20: 512 bits
+  C21: 1024 bits
+  C22: 1024 bits
+
+Iniciando solucao com 10 threads...
+
+[Thread 0x16ffbb000] Iniciando C0 ([Thread 16 bits)...
+[Thread 0x170047000] Iniciando C2 (32 bits)...
+[Thread 0x170277000] Iniciando C3 (40 bits)...
+0x16fea3000] Iniciando C1 (32 bits)...
+[Thread 0x16ffbb000] C0 RESOLVIDO em 0.000s
+[Thread 0x16fea3000] C1 RESOLVIDO em 0.000s
+[Thread 0x16ffbb000] Iniciando C4 (40 bits)...
+[Thread 0x16fea3000] Iniciando C5 (48 bits)...
+[Thread 0x16ffbb000] C4 RESOLVIDO em 0.000s
+[Thread 0x16ffbb000] Iniciando C6 (48 bits)...
+[Thread 0x16fea3000] C5 RESOLVIDO em 0.000s
+[Thread 0x16fea3000] Iniciando C7 (64 bits)...
+[Thread 0x16fea3000] C7 RESOLVIDO em 0.000s
+[Thread 0x16fea3000] Iniciando C8 (64 bits)...
+[Thread 0x16ff2f000] Iniciando C9 (80 bits)...
+[Thread 0x16fd8b000] Iniciando C10 (80 bits)...
+[Thread [Thread 0x16fe17000] Iniciando C0x1701eb000] Iniciando C[Thread 12 (96 bits)...
+0x1700d3000] Iniciando C13 (112 bits)...
+11 (96 bits)...
+[Thread 0x17015f000] Iniciando C14 (112 bits)...
+[Thread 0x16fd8b000] C10 RESOLVIDO em 0.001s
+[Thread 0x16fd8b000] Iniciando C15 (128 bits)...
+[Thread 0x16fe17000] C11 RESOLVIDO em 0.001s
+[Thread 0x16fe17000] Iniciando C16 (128 bits)...
+[Thread 0x17015f000] C14 RESOLVIDO em 0.001s
+[Thread 0x17015f000] Iniciando C17 (256 bits)...
+[Thread 0x16fe17000] C16 RESOLVIDO em 0.002s
+[Thread 0x16fe17000] Iniciando C18 (256 bits)...
+[Thread 0x17015f000] C17 RESOLVIDO em 0.013s
+[Thread 0x17015f000] Iniciando C19 (512 bits)...
+[Thread 0x170047000] C2 RESOLVIDO em 0.029s
+[Thread 0x170047000] Iniciando C20 (512 bits)...
+[Thread 0x17015f000] C19 RESOLVIDO em 0.099s
+[Thread 0x17015f000] Iniciando C21 (1024 bits)...
+[Thread 0x170277000] C3 RESOLVIDO em 1.781s
+[Thread 0x170277000] Iniciando C22 (1024 bits)...
+[Thread 0x170277000] C22 RESOLVIDO em 2.670s
+[Thread 0x16ffbb000] C6 RESOLVIDO em 42.467s
+[Thread 0x170047000] C20 TIMEOUT apos 3600.007s
+[Thread 0x17015f000] C21 TIMEOUT apos 3600.003s
+[Thread 0x16fea3000] C8 TIMEOUT apos 3674.143s
+[Thread 0x16ff2f000] C9 TIMEOUT apos 4345.433s
+[Thread 0x16fd8b000] C15 TIMEOUT apos 4348.432s
+[Thread 0x1700d3000] C13 TIMEOUT apos 4348.567s
+[Thread 0x1701eb000] C12 TIMEOUT apos 4348.996s
+[Thread 0x16fe17000] C18 TIMEOUT apos 4351.309s
+
+========================================
+RESUMO
+========================================
+Total de desafios: 23
+Resolvidos: 15
+Timeout: 8
+Tempo total: 4351.314s
+
+Tempos individuais:
+  C0 (16 bits): 0.000s - K_ab = 15261
+  C1 (32 bits): 0.000s - K_ab = 2315847872
+  C2 (32 bits): 0.029s - K_ab = 211958971
+  C3 (40 bits): 1.781s - K_ab = 298509300911
+  C4 (40 bits): 0.000s - K_ab = 290240289861
+  C5 (48 bits): 0.000s - K_ab = 87559281402002
+  C6 (48 bits): 42.467s - K_ab = 139741286422486
+  C7 (64 bits): 0.000s - K_ab = 5423980969977744708
+  C8 (64 bits): TIMEOUT (3674.143s)
+  C9 (80 bits): TIMEOUT (4345.433s)
+  C10 (80 bits): 0.001s - K_ab = 2551440541766016557167
+  C11 (96 bits): 0.001s - K_ab = 27055793202008997473656732406
+  C12 (96 bits): TIMEOUT (4348.996s)
+  C13 (112 bits): TIMEOUT (4348.567s)
+  C14 (112 bits): 0.001s - K_ab = 3555655507609468817009304130465647
+  C15 (128 bits): TIMEOUT (4348.432s)
+  C16 (128 bits): 0.002s - K_ab = 7831351790774517194506812766211328849
+  C17 (256 bits): 0.013s - K_ab = 8631587089130217535419494302484665400348447490678780423634850316061917855379
+  C18 (256 bits): TIMEOUT (4351.309s)
+  C19 (512 bits): 0.099s - K_ab = 3567226372562732674477208048753339343687048249635667815283740626207360272078503843792761110428898596821834186579595905560904099923208116713573260774996532
+  C20 (512 bits): TIMEOUT (3600.007s)
+  C21 (1024 bits): TIMEOUT (3600.003s)
+  C22 (1024 bits): 2.670s - K_ab = 21964133643034780134137973822318277233808233155947493667247441917352030881187956205775390451983349900706028857548706305717573706001570541308504529387620320206210460875704125512367238468579490695551788075134035881573659182930779821993022251173991374927575843091843737568268988708260942622613659646621194578288
+
+Salvando solucoes pendentes...
+
+Solucoes salvas em: solucao.txt
+(Arquivo salvo incrementalmente durante execucao)
+brunobks@192 t2 % cat solucao.txt 
+# DLP Solver - Solucoes
+# Gerado em: 1781975548538680
+# Total de desafios: 23
+#
+[C0] 15261
+[C1] 2315847872
+[C4] 290240289861
+[C5] 87559281402002
+[C7] 5423980969977744708
+[C10] 2551440541766016557167
+[C11] 27055793202008997473656732406
+[C14] 3555655507609468817009304130465647
+[C16] 7831351790774517194506812766211328849
+[C17] 8631587089130217535419494302484665400348447490678780423634850316061917855379
+[C2] 211958971
+[C19] 3567226372562732674477208048753339343687048249635667815283740626207360272078503843792761110428898596821834186579595905560904099923208116713573260774996532
+[C3] 298509300911
+[C22] 21964133643034780134137973822318277233808233155947493667247441917352030881187956205775390451983349900706028857548706305717573706001570541308504529387620320206210460875704125512367238468579490695551788075134035881573659182930779821993022251173991374927575843091843737568268988708260942622613659646621194578288
+[C6] 139741286422486
+[C20] # Timeout ou erro: Timeout apos 3600s
+[C21] # Timeout ou erro: Timeout apos 3600s
+[C8] # Timeout ou erro: Timeout apos 3674s
+[C9] # Timeout ou erro: Timeout apos 4345s
+[C15] # Timeout ou erro: Timeout apos 4348s
+[C13] # Timeout ou erro: Timeout apos 4348s
+[C12] # Timeout ou erro: Timeout apos 4348s
+[C18] # Timeout ou erro: Timeout apos 4351s
+brunobks@192 t2 % 
+  [Restaurado 20 de jun. de 2026, 22:37:51]
+Last login: Sat Jun 20 22:37:24 on console
+Restored session: sáb 20 jun 2026 22:29:04 -03

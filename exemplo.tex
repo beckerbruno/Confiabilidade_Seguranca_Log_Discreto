@@ -1,0 +1,790 @@
+\documentclass[conference, onecolumn]{IEEEtran}
+\usepackage[utf8]{inputenc}
+\usepackage[portuguese]{babel}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{caption}
+\usepackage{longtable}
+\usepackage[hidelinks]{hyperref}
+
+\lstset{
+    basicstyle=\ttfamily\footnotesize,
+    backgroundcolor=\color{gray!10},
+    frame=single,
+    breaklines=true,
+    columns=fullflexible,
+    keepspaces=true,
+    tabsize=4,
+    showstringspaces=false,
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    stepnumber=1,
+    numbersep=5pt
+}
+
+% =========================================================
+\title{Trabalho Prático 1 --- Teste Funcional\\
+\large Confiabilidade e Segurança de Software}
+
+\author{
+    \IEEEauthorblockN{Bruno Becker Silva}
+    \IEEEauthorblockA{Escola Politécnica, PUCRS \\ \texttt{bruno.becker@edu.pucrs.br}}
+}
+
+\begin{document}
+\maketitle
+
+% =========================================================
+\section*{Resumo}
+
+Este relatório apresenta a suíte de testes funcionais de caixa-preta desenvolvida para a
+função \texttt{calcular\_dano()}, aplicando as técnicas de Particionamento de Equivalência
+(PE) e Análise do Valor Limite (BVA). Foram projetados 47 casos de teste que detectam
+corretamente defeitos em 10 versões defeituosas da implementação.
+
+% =========================================================
+\section{Especificação da Função}
+
+A função sob teste possui a seguinte assinatura em C:
+
+\begin{lstlisting}[language=C, numbers=none]
+int calcular_dano(int poder_ataque, int defesa, int tipo_ataque, int eh_critico);
+\end{lstlisting}
+
+\subsection{Domínio dos Parâmetros}
+
+\begin{table}[H]
+\centering
+\caption{Domínio de cada parâmetro de \texttt{calcular\_dano}.}
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Parâmetro} & \textbf{Tipo} & \textbf{Domínio} & \textbf{Descrição} \\
+\midrule
+\texttt{poder\_ataque} & int & {[}1, 150{]} & Poder de ataque do personagem \\
+\texttt{defesa}        & int & {[}0, 150{]} & Defesa do alvo \\
+\texttt{tipo\_ataque}  & int & \{1, 2, 3\}  & 1=físico, 2=mágico, 3=verdadeiro \\
+\texttt{eh\_critico}   & int & \{0, 1\}     & 0=normal, 1=golpe crítico \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Regras de Cálculo (em ordem)}
+
+\begin{enumerate}
+    \item \textbf{Validação:} qualquer parâmetro fora do domínio $\Rightarrow$ retorna $-1$
+    \item \textbf{Dano base:}
+    \begin{itemize}
+        \item Físico (1): $\text{dano} = \texttt{poder\_ataque} - \texttt{defesa}$
+        \item Mágico (2): $\text{dano} = \texttt{poder\_ataque} - \lfloor\texttt{defesa}/2\rfloor$
+        \item Verdadeiro (3): $\text{dano} = \texttt{poder\_ataque}$ (ignora \texttt{defesa})
+    \end{itemize}
+    \item \textbf{Dano mínimo:} se $\text{dano} < 1 \Rightarrow \text{dano} = 1$
+    \item \textbf{Golpe crítico:} se $\texttt{eh\_critico} = 1 \Rightarrow \text{dano} = \text{dano} \times 2$
+    \item \textbf{Retorno:} valor final de \texttt{dano}
+\end{enumerate}
+
+% =========================================================
+\section{Entregável 1 — Classes de Equivalência}
+
+\subsection{Classes Inválidas (CEI)}
+
+\begin{table}[H]
+\centering
+\caption{Classes de equivalência inválidas.}
+\begin{tabular}{@{}lllp{5.5cm}@{}}
+\toprule
+\textbf{Classe} & \textbf{Parâmetro} & \textbf{Condição} & \textbf{Resultado esperado} \\
+\midrule
+CEI-1 & \texttt{poder\_ataque} & $< 1$   & Retorna $-1$ (invalida toda a chamada) \\
+CEI-2 & \texttt{poder\_ataque} & $> 150$ & Retorna $-1$ \\
+CEI-3 & \texttt{defesa}        & $< 0$   & Retorna $-1$ \\
+CEI-4 & \texttt{defesa}        & $> 150$ & Retorna $-1$ \\
+CEI-5 & \texttt{tipo\_ataque}  & $< 1$   & Retorna $-1$ \\
+CEI-6 & \texttt{tipo\_ataque}  & $> 3$   & Retorna $-1$ \\
+CEI-7 & \texttt{eh\_critico}   & $< 0$   & Retorna $-1$ \\
+CEI-8 & \texttt{eh\_critico}   & $> 1$   & Retorna $-1$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Classes Válidas (CEV)}
+
+\begin{table}[H]
+\centering
+\caption{Classes de equivalência válidas.}
+\begin{tabular}{@{}llp{7cm}@{}}
+\toprule
+\textbf{Classe} & \textbf{Combinação} & \textbf{Descrição} \\
+\midrule
+CEV-1  & Físico / normal / dano$>$0        & \texttt{poder} $>$ \texttt{defesa}: dano base positivo sem crítico \\
+CEV-2  & Físico / normal / dano$\leq$0     & \texttt{poder} $\leq$ \texttt{defesa}: dano mínimo ativado \\
+CEV-3  & Físico / crítico / dano$>$0       & Dano base positivo com multiplicador crítico \\
+CEV-4  & Físico / crítico / dano$\leq$0    & Dano mínimo ativado, depois crítico (ordem das regras 3 e 4) \\
+CEV-5  & Mágico / normal / dano$>$0        & Dano base $= \texttt{poder} - \lfloor\texttt{defesa}/2\rfloor > 0$ \\
+CEV-6  & Mágico / normal / dano$\leq$0     & Dano base negativo, mínimo ativado \\
+CEV-7  & Mágico / crítico / dano$>$0       & Dano mágico positivo com multiplicador crítico \\
+CEV-8  & Mágico / crítico / dano$\leq$0    & Mínimo ativado antes do crítico \\
+CEV-9  & Verdadeiro / normal               & \texttt{defesa} ignorada; dano $= \texttt{poder}$ \\
+CEV-10 & Verdadeiro / crítico              & \texttt{defesa} ignorada; dano $= \texttt{poder} \times 2$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% =========================================================
+\section{Entregável 2 — Análise do Valor Limite (BVA)}
+
+\begin{table}[H]
+\centering
+\caption{Valores on/off para cada parâmetro e para a fronteira do dano mínimo.}
+\begin{tabular}{@{}lllll@{}}
+\toprule
+\textbf{Parâmetro} & \textbf{On-min} & \textbf{Off-min} & \textbf{On-max} & \textbf{Off-max} \\
+\midrule
+\texttt{poder\_ataque} & 1 (válido) & 0 $\to -1$ & 150 (válido) & 151 $\to -1$ \\
+\texttt{defesa}        & 0 (válido) & $-1 \to -1$ & 150 (válido) & 151 $\to -1$ \\
+\texttt{tipo\_ataque}  & 1 (válido) & 0 $\to -1$ & 3 (válido) & 4 $\to -1$ \\
+\texttt{eh\_critico}   & 0 (válido) & $-1 \to -1$ & 1 (válido) & 2 $\to -1$ \\
+\midrule
+\multicolumn{5}{l}{\textbf{Fronteira do dano mínimo} (dano\_base $\in \{0, 1\}$, com e sem crítico)} \\
+\midrule
+dano\_base = 0 & \multicolumn{4}{l}{mínimo ativado $\Rightarrow$ retorna 1 (ou 2 com crítico)} \\
+dano\_base = 1 & \multicolumn{4}{l}{mínimo \textit{não} ativado $\Rightarrow$ retorna 1 (mas por caminho diferente)} \\
+dano\_base = 0 + crítico & \multicolumn{4}{l}{mínimo $\to$ 1 $\to$ crítico $\to$ 2 (testa ordem das regras 3 e 4)} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% =========================================================
+\section{Entregável 3 — Suíte de Testes}
+
+A Tabela~\ref{tab:suite} apresenta os 47 casos de teste projetados, organizados em 8 blocos.
+
+\begin{longtable}{@{}p{0.5cm}p{0.8cm}p{0.8cm}p{0.5cm}p{0.7cm}p{1.0cm}p{0.9cm}p{3.5cm}@{}}
+\caption{Suíte completa de 47 casos de teste para \texttt{calcular\_dano}.}
+\label{tab:suite} \\
+\toprule
+\textbf{ID} & \textbf{poder} & \textbf{defesa} & \textbf{tipo} & \textbf{crit.} & \textbf{Esperado} & \textbf{Técnica} & \textbf{Classe/Fronteira} \\
+\midrule
+\endfirsthead
+\multicolumn{8}{l}{\small\textit{Tabela~\ref{tab:suite} — continuação}} \\
+\toprule
+\textbf{ID} & \textbf{poder} & \textbf{defesa} & \textbf{tipo} & \textbf{crit.} & \textbf{Esperado} & \textbf{Técnica} & \textbf{Classe/Fronteira} \\
+\midrule
+\endhead
+\midrule
+\multicolumn{8}{r}{\small\textit{continua na próxima página}} \\
+\endfoot
+\bottomrule
+\endlastfoot
+% --- Bloco 1: Classes Inválidas ---
+\multicolumn{8}{l}{\textit{Bloco 1 — Classes Inválidas (PE)}} \\
+T01 & 0    & 10  & 1 & 0 & $-1$ & PE & CEI-1: poder $< 1$ (zero) \\
+T02 & $-5$ & 10  & 1 & 0 & $-1$ & PE & CEI-1: poder $< 1$ (negativo) \\
+T03 & 151  & 10  & 1 & 0 & $-1$ & PE & CEI-2: poder $> 150$ \\
+T04 & 50   & $-1$& 1 & 0 & $-1$ & PE & CEI-3: defesa $< 0$ \\
+T05 & 50   & 151 & 1 & 0 & $-1$ & PE & CEI-4: defesa $> 150$ \\
+T06 & 50   & 10  & 0 & 0 & $-1$ & PE & CEI-5: tipo $< 1$ \\
+T07 & 50   & 10  & 4 & 0 & $-1$ & PE & CEI-6: tipo $> 3$ \\
+T08 & 50   & 10  & 1 & $-1$ & $-1$ & PE & CEI-7: crítico $< 0$ \\
+T09 & 50   & 10  & 1 & 2 & $-1$ & PE & CEI-8: crítico $> 1$ \\
+\midrule
+% --- Bloco 2: Classes Válidas ---
+\multicolumn{8}{l}{\textit{Bloco 2 — Classes Válidas (PE)}} \\
+T10 & 100 & 30  & 1 & 0 & 70  & PE & CEV-1: físico normal \\
+T11 & 30  & 50  & 1 & 0 & 1   & PE & CEV-2: físico + dano mínimo \\
+T12 & 100 & 30  & 1 & 1 & 140 & PE & CEV-3: físico crítico \\
+T13 & 30  & 50  & 1 & 1 & 2   & PE & CEV-4: físico crítico + dano mínimo \\
+T14 & 100 & 40  & 2 & 0 & 80  & PE & CEV-5: mágico normal \\
+T15 & 5   & 12  & 2 & 0 & 1   & PE & CEV-6: mágico + dano mínimo \\
+T16 & 100 & 40  & 2 & 1 & 160 & PE & CEV-7: mágico crítico \\
+T17 & 5   & 12  & 2 & 1 & 2   & PE & CEV-8: mágico crítico + dano mínimo \\
+T18 & 75  & 150 & 3 & 0 & 75  & PE & CEV-9: verdadeiro normal \\
+T19 & 75  & 150 & 3 & 1 & 150 & PE & CEV-10: verdadeiro crítico \\
+\midrule
+% --- Bloco 3: BVA poder ---
+\multicolumn{8}{l}{\textit{Bloco 3 — BVA: \texttt{poder\_ataque} {[}1, 150{]}}} \\
+T20 & 1   & 0  & 1 & 0 & 1    & BVA & On-min: poder=1 (válido) \\
+T21 & 0   & 0  & 1 & 0 & $-1$ & BVA & Off-min: poder=0 (inválido) \\
+T22 & 150 & 0  & 1 & 0 & 150  & BVA & On-max: poder=150 (válido) \\
+T23 & 151 & 0  & 1 & 0 & $-1$ & BVA & Off-max: poder=151 (inválido) \\
+\midrule
+% --- Bloco 4: BVA defesa ---
+\multicolumn{8}{l}{\textit{Bloco 4 — BVA: \texttt{defesa} {[}0, 150{]}}} \\
+T24 & 50  & 0   & 1 & 0 & 50   & BVA & On-min: defesa=0 (válido) \\
+T25 & 50  & $-1$& 1 & 0 & $-1$ & BVA & Off-min: defesa=$-1$ (inválido) \\
+T26 & 150 & 150 & 1 & 0 & 1    & BVA & On-max: defesa=150 (válido) \\
+T27 & 50  & 151 & 1 & 0 & $-1$ & BVA & Off-max: defesa=151 (inválido) \\
+\midrule
+% --- Bloco 5: BVA tipo ---
+\multicolumn{8}{l}{\textit{Bloco 5 — BVA: \texttt{tipo\_ataque} \{1, 2, 3\}}} \\
+T28 & 50 & 10 & 1 & 0 & 40   & BVA & On-min: tipo=1 (físico válido) \\
+T29 & 50 & 10 & 0 & 0 & $-1$ & BVA & Off-min: tipo=0 (inválido) \\
+T30 & 50 & 10 & 3 & 0 & 50   & BVA & On-max: tipo=3 (verdadeiro válido) \\
+T31 & 50 & 10 & 4 & 0 & $-1$ & BVA & Off-max: tipo=4 (inválido) \\
+\midrule
+% --- Bloco 6: BVA crítico ---
+\multicolumn{8}{l}{\textit{Bloco 6 — BVA: \texttt{eh\_critico} \{0, 1\}}} \\
+T32 & 50 & 10 & 1 & 0  & 40   & BVA & On-min: crítico=0 (normal válido) \\
+T33 & 50 & 10 & 1 & $-1$ & $-1$ & BVA & Off-min: crítico=$-1$ (inválido) \\
+T34 & 50 & 10 & 1 & 1  & 80   & BVA & On-max: crítico=1 (válido) \\
+T35 & 50 & 10 & 1 & 2  & $-1$ & BVA & Off-max: crítico=2 (inválido) \\
+\midrule
+% --- Bloco 7: BVA dano mínimo ---
+\multicolumn{8}{l}{\textit{Bloco 7 — BVA: fronteira do dano mínimo}} \\
+T36 & 50 & 50 & 1 & 0 & 1 & BVA & Físico: dano\_base=0 $\to$ mínimo ativado \\
+T37 & 51 & 50 & 1 & 0 & 1 & BVA & Físico: dano\_base=1 $\to$ mínimo não ativado \\
+T38 & 5  & 10 & 2 & 0 & 1 & BVA & Mágico: dano\_base=0 $\to$ mínimo ativado \\
+T39 & 6  & 10 & 2 & 0 & 1 & BVA & Mágico: dano\_base=1 $\to$ mínimo não ativado \\
+T40 & 50 & 50 & 1 & 1 & 2 & BVA & Físico+crítico: ordem mín$\to$crítico \\
+T41 & 5  & 10 & 2 & 1 & 2 & BVA & Mágico+crítico: ordem mín$\to$crítico \\
+\midrule
+% --- Bloco 8: Casos adicionais ---
+\multicolumn{8}{l}{\textit{Bloco 8 — Casos adicionais}} \\
+T42 & 50  & 11  & 2 & 0 & 45  & PE & $\lfloor 11/2 \rfloor = 5$ (divisão inteira ímpar) \\
+T43 & 50  & 1   & 2 & 0 & 50  & PE & $\lfloor 1/2 \rfloor = 0$ (defesa=1 não subtrai) \\
+T44 & 1   & 150 & 3 & 0 & 1   & PE & Verdadeiro ignora defesa máxima \\
+T45 & 150 & 150 & 1 & 1 & 2   & PE & Físico pow=def=150: mín$\to$1$\to$crítico$\to$2 \\
+T46 & 150 & 100 & 3 & 1 & 300 & PE & Verdadeiro poder máx + crítico \\
+T47 & 50  & 11  & 2 & 1 & 90  & PE & Mágico defesa ímpar + crítico: $45\times2=90$ \\
+\end{longtable}
+
+% =========================================================
+\section{Entregável 4 — Código-Fonte dos Testes}
+
+\subsection{TestCalcularDano.c}
+
+\begin{lstlisting}[language=C, caption={TestCalcularDano.c --- suíte de 47 testes funcionais.}]
+/*
+ * TestCalcularDano.c
+ * Suite de testes funcionais (caixa-preta) para calcular_dano().
+ *
+ * Tecnicas aplicadas:
+ *   PE  = Particionamento de Equivalencia
+ *   BVA = Analise do Valor Limite (Boundary Value Analysis)
+ *
+ * Parametros e dominios:
+ *   poder_ataque : [1, 150]
+ *   defesa       : [0, 150]
+ *   tipo_ataque  : {1=fisico, 2=magico, 3=verdadeiro}
+ *   eh_critico   : {0=normal, 1=critico}
+ *
+ * Regras (em ordem):
+ *   1. Validacao   : parametro fora do dominio => retorna -1
+ *   2. Dano base   : fisico=poder-defesa | magico=poder-floor(defesa/2) | verdadeiro=poder
+ *   3. Dano minimo : dano < 1 => dano = 1
+ *   4. Critico     : eh_critico=1 => dano = dano * 2
+ *   5. Retorno     : dano final
+ */
+
+#include "unity.h"
+#include "unity_fixture.h"
+#include "calcular_dano.h"
+
+TEST_GROUP(CalcularDano);
+TEST_SETUP(CalcularDano)    { /* nada */ }
+TEST_TEAR_DOWN(CalcularDano){ /* nada */ }
+
+/* =========================================================
+ * BLOCO 1 - Particionamento de Equivalencia: Classes Invalidas
+ * ========================================================= */
+
+/* CEI-1: poder_ataque < 1 (zero) */
+TEST(CalcularDano, T01_Invalido_PoderZero)
+{
+    TEST_ASSERT_EQUAL(-1, calcular_dano(0, 10, 1, 0));
+}
+
+/* CEI-1: poder_ataque < 1 (negativo) */
+TEST(CalcularDano, T02_Invalido_PoderNegativo)
+{
+    TEST_ASSERT_EQUAL(-1, calcular_dano(-5, 10, 1, 0));
+}
+
+/* CEI-2: poder_ataque > 150 */
+TEST(CalcularDano, T03_Invalido_PoderExcede)
+{
+    TEST_ASSERT_EQUAL(-1, calcular_dano(151, 10, 1, 0));
+}
+
+/* CEI-3: defesa < 0 */
+TEST(CalcularDano, T04_Invalido_DefesaNegativa)
+{
+    TEST_ASSERT_EQUAL(-1, calcular_dano(50, -1, 1, 0));
+}
+
+/* CEI-4: defesa > 150 */
+TEST(CalcularDano, T05_Invalido_DefesaExcede)
+{
+    TEST_ASSERT_EQUAL(-1, calcular_dano(50, 151, 1, 0));
+}
+
+/* CEI-5: tipo_ataque < 1 */
+TEST(CalcularDano, T06_Invalido_TipoZero)
+{
+    TEST_ASSERT_EQUAL(-1, calcular_dano(50, 10, 0, 0));
+}
+
+/* CEI-6: tipo_ataque > 3 */
+TEST(CalcularDano, T07_Invalido_TipoExcede)
+{
+    TEST_ASSERT_EQUAL(-1, calcular_dano(50, 10, 4, 0));
+}
+
+/* CEI-7: eh_critico < 0 */
+TEST(CalcularDano, T08_Invalido_CriticoNegativo)
+{
+    TEST_ASSERT_EQUAL(-1, calcular_dano(50, 10, 1, -1));
+}
+
+/* CEI-8: eh_critico > 1 */
+TEST(CalcularDano, T09_Invalido_CriticoExcede)
+{
+    TEST_ASSERT_EQUAL(-1, calcular_dano(50, 10, 1, 2));
+}
+
+/* =========================================================
+ * BLOCO 2 - Particionamento de Equivalencia: Classes Validas
+ * ========================================================= */
+
+/* CEV-1: Fisico, normal, dano_base > 0 --- dano = 100-30 = 70 */
+TEST(CalcularDano, T10_Fisico_Normal)
+{
+    TEST_ASSERT_EQUAL(70, calcular_dano(100, 30, 1, 0));
+}
+
+/* CEV-2: Fisico, normal, minimo ativado --- dano = max(-20,1) = 1 */
+TEST(CalcularDano, T11_Fisico_Normal_DanoMinimo)
+{
+    TEST_ASSERT_EQUAL(1, calcular_dano(30, 50, 1, 0));
+}
+
+/* CEV-3: Fisico, critico --- dano = 70*2 = 140 */
+TEST(CalcularDano, T12_Fisico_Critico)
+{
+    TEST_ASSERT_EQUAL(140, calcular_dano(100, 30, 1, 1));
+}
+
+/* CEV-4: Fisico, critico, minimo --- dano = min(-20)=1 => 1*2=2 */
+TEST(CalcularDano, T13_Fisico_Critico_DanoMinimo)
+{
+    TEST_ASSERT_EQUAL(2, calcular_dano(30, 50, 1, 1));
+}
+
+/* CEV-5: Magico, normal --- dano = 100-floor(40/2)=80 */
+TEST(CalcularDano, T14_Magico_Normal)
+{
+    TEST_ASSERT_EQUAL(80, calcular_dano(100, 40, 2, 0));
+}
+
+/* CEV-6: Magico, normal, minimo --- dano = 5-6=-1 => 1 */
+TEST(CalcularDano, T15_Magico_Normal_DanoMinimo)
+{
+    TEST_ASSERT_EQUAL(1, calcular_dano(5, 12, 2, 0));
+}
+
+/* CEV-7: Magico, critico --- dano = 80*2=160 */
+TEST(CalcularDano, T16_Magico_Critico)
+{
+    TEST_ASSERT_EQUAL(160, calcular_dano(100, 40, 2, 1));
+}
+
+/* CEV-8: Magico, critico, minimo --- dano = -1=>1 => 1*2=2 */
+TEST(CalcularDano, T17_Magico_Critico_DanoMinimo)
+{
+    TEST_ASSERT_EQUAL(2, calcular_dano(5, 12, 2, 1));
+}
+
+/* CEV-9: Verdadeiro, normal --- ignora defesa; dano = 75 */
+TEST(CalcularDano, T18_Verdadeiro_Normal)
+{
+    TEST_ASSERT_EQUAL(75, calcular_dano(75, 150, 3, 0));
+}
+
+/* CEV-10: Verdadeiro, critico --- dano = 75*2=150 */
+TEST(CalcularDano, T19_Verdadeiro_Critico)
+{
+    TEST_ASSERT_EQUAL(150, calcular_dano(75, 150, 3, 1));
+}
+
+/* =========================================================
+ * BLOCO 3 - BVA: poder_ataque [1, 150]
+ * ========================================================= */
+
+/* BVA poder=1 (on-min): dano = 1-0 = 1 */
+TEST(CalcularDano, T20_BVA_PoderMin_On)
+{
+    TEST_ASSERT_EQUAL(1, calcular_dano(1, 0, 1, 0));
+}
+
+/* BVA poder=0 (off-min): invalido */
+TEST(CalcularDano, T21_BVA_PoderMin_Off)
+{
+    TEST_ASSERT_EQUAL(-1, calcular_dano(0, 0, 1, 0));
+}
+
+/* BVA poder=150 (on-max): dano = 150-0 = 150 */
+TEST(CalcularDano, T22_BVA_PoderMax_On)
+{
+    TEST_ASSERT_EQUAL(150, calcular_dano(150, 0, 1, 0));
+}
+
+/* BVA poder=151 (off-max): invalido */
+TEST(CalcularDano, T23_BVA_PoderMax_Off)
+{
+    TEST_ASSERT_EQUAL(-1, calcular_dano(151, 0, 1, 0));
+}
+
+/* =========================================================
+ * BLOCO 4 - BVA: defesa [0, 150]
+ * ========================================================= */
+
+/* BVA defesa=0 (on-min): dano = 50-0 = 50 */
+TEST(CalcularDano, T24_BVA_DefesaMin_On)
+{
+    TEST_ASSERT_EQUAL(50, calcular_dano(50, 0, 1, 0));
+}
+
+/* BVA defesa=-1 (off-min): invalido */
+TEST(CalcularDano, T25_BVA_DefesaMin_Off)
+{
+    TEST_ASSERT_EQUAL(-1, calcular_dano(50, -1, 1, 0));
+}
+
+/* BVA defesa=150 (on-max): dano = 150-150=0 => min => 1 */
+TEST(CalcularDano, T26_BVA_DefesaMax_On)
+{
+    TEST_ASSERT_EQUAL(1, calcular_dano(150, 150, 1, 0));
+}
+
+/* BVA defesa=151 (off-max): invalido */
+TEST(CalcularDano, T27_BVA_DefesaMax_Off)
+{
+    TEST_ASSERT_EQUAL(-1, calcular_dano(50, 151, 1, 0));
+}
+
+/* =========================================================
+ * BLOCO 5 - BVA: tipo_ataque {1, 2, 3}
+ * ========================================================= */
+
+/* BVA tipo=1 (on-min): fisico valido --- dano = 50-10=40 */
+TEST(CalcularDano, T28_BVA_TipoMin_On)
+{
+    TEST_ASSERT_EQUAL(40, calcular_dano(50, 10, 1, 0));
+}
+
+/* BVA tipo=0 (off-min): invalido */
+TEST(CalcularDano, T29_BVA_TipoMin_Off)
+{
+    TEST_ASSERT_EQUAL(-1, calcular_dano(50, 10, 0, 0));
+}
+
+/* BVA tipo=3 (on-max): verdadeiro valido --- dano = 50 */
+TEST(CalcularDano, T30_BVA_TipoMax_On)
+{
+    TEST_ASSERT_EQUAL(50, calcular_dano(50, 10, 3, 0));
+}
+
+/* BVA tipo=4 (off-max): invalido */
+TEST(CalcularDano, T31_BVA_TipoMax_Off)
+{
+    TEST_ASSERT_EQUAL(-1, calcular_dano(50, 10, 4, 0));
+}
+
+/* =========================================================
+ * BLOCO 6 - BVA: eh_critico {0, 1}
+ * ========================================================= */
+
+/* BVA critico=0 (on-min): normal valido --- dano = 40 */
+TEST(CalcularDano, T32_BVA_CriticoMin_On)
+{
+    TEST_ASSERT_EQUAL(40, calcular_dano(50, 10, 1, 0));
+}
+
+/* BVA critico=-1 (off-min): invalido */
+TEST(CalcularDano, T33_BVA_CriticoMin_Off)
+{
+    TEST_ASSERT_EQUAL(-1, calcular_dano(50, 10, 1, -1));
+}
+
+/* BVA critico=1 (on-max): critico valido --- dano = 80 */
+TEST(CalcularDano, T34_BVA_CriticoMax_On)
+{
+    TEST_ASSERT_EQUAL(80, calcular_dano(50, 10, 1, 1));
+}
+
+/* BVA critico=2 (off-max): invalido */
+TEST(CalcularDano, T35_BVA_CriticoMax_Off)
+{
+    TEST_ASSERT_EQUAL(-1, calcular_dano(50, 10, 1, 2));
+}
+
+/* =========================================================
+ * BLOCO 7 - BVA: fronteira do dano minimo
+ * ========================================================= */
+
+/* Fisico: dano_base=0 (minimo ativado) --- 50-50=0 => 1 */
+TEST(CalcularDano, T36_BVA_DanoMin_Fisico_On)
+{
+    TEST_ASSERT_EQUAL(1, calcular_dano(50, 50, 1, 0));
+}
+
+/* Fisico: dano_base=1 (minimo nao ativado) --- 51-50=1 */
+TEST(CalcularDano, T37_BVA_DanoMin_Fisico_Off)
+{
+    TEST_ASSERT_EQUAL(1, calcular_dano(51, 50, 1, 0));
+}
+
+/* Magico: dano_base=0 --- 5-floor(10/2)=0 => 1 */
+TEST(CalcularDano, T38_BVA_DanoMin_Magico_On)
+{
+    TEST_ASSERT_EQUAL(1, calcular_dano(5, 10, 2, 0));
+}
+
+/* Magico: dano_base=1 --- 6-floor(10/2)=1 */
+TEST(CalcularDano, T39_BVA_DanoMin_Magico_Off)
+{
+    TEST_ASSERT_EQUAL(1, calcular_dano(6, 10, 2, 0));
+}
+
+/* Fisico + critico: testa ordem min -> critico
+ * 50-50=0 => min=1 => critico => 2
+ * (se ordem errada: 0*2=0 => min=1, resultado igual mas caminho errado) */
+TEST(CalcularDano, T40_BVA_OrdemMin_Critico_Fisico)
+{
+    TEST_ASSERT_EQUAL(2, calcular_dano(50, 50, 1, 1));
+}
+
+/* Magico + critico: testa ordem min -> critico
+ * 5-5=0 => min=1 => critico => 2 */
+TEST(CalcularDano, T41_BVA_OrdemMin_Critico_Magico)
+{
+    TEST_ASSERT_EQUAL(2, calcular_dano(5, 10, 2, 1));
+}
+
+/* =========================================================
+ * BLOCO 8 - Casos adicionais para detectar defeitos tipicos
+ * ========================================================= */
+
+/* Magico com defesa impar: floor(11/2)=5, nao 6 --- dano = 50-5=45 */
+TEST(CalcularDano, T42_Magico_DefesaImpar)
+{
+    TEST_ASSERT_EQUAL(45, calcular_dano(50, 11, 2, 0));
+}
+
+/* Magico com defesa=1: floor(1/2)=0 --- dano = 50-0=50 */
+TEST(CalcularDano, T43_Magico_DefesaUm)
+{
+    TEST_ASSERT_EQUAL(50, calcular_dano(50, 1, 2, 0));
+}
+
+/* Verdadeiro ignora defesa maxima --- dano = 1 */
+TEST(CalcularDano, T44_Verdadeiro_IgnoraDefesaMaxima)
+{
+    TEST_ASSERT_EQUAL(1, calcular_dano(1, 150, 3, 0));
+}
+
+/* Fisico poder=defesa=150, critico --- 150-150=0=>1=>2 */
+TEST(CalcularDano, T45_Fisico_MaxMax_Critico)
+{
+    TEST_ASSERT_EQUAL(2, calcular_dano(150, 150, 1, 1));
+}
+
+/* Verdadeiro poder maximo + critico --- 150*2=300 */
+TEST(CalcularDano, T46_Verdadeiro_PoderMax_Critico)
+{
+    TEST_ASSERT_EQUAL(300, calcular_dano(150, 100, 3, 1));
+}
+
+/* Magico defesa impar + critico --- 45*2=90 */
+TEST(CalcularDano, T47_Magico_DefesaImpar_Critico)
+{
+    TEST_ASSERT_EQUAL(90, calcular_dano(50, 11, 2, 1));
+}
+\end{lstlisting}
+
+\subsection{TestCalcularDano\_Runner.c}
+
+\begin{lstlisting}[language=C, caption={TestCalcularDano\_Runner.c --- registra os 47 casos no grupo Unity.}]
+#include "unity.h"
+#include "unity_fixture.h"
+
+TEST_GROUP_RUNNER(CalcularDano)
+{
+    /* --- Bloco 1: Classes Invalidas (PE) --- */
+    RUN_TEST_CASE(CalcularDano, T01_Invalido_PoderZero);
+    RUN_TEST_CASE(CalcularDano, T02_Invalido_PoderNegativo);
+    RUN_TEST_CASE(CalcularDano, T03_Invalido_PoderExcede);
+    RUN_TEST_CASE(CalcularDano, T04_Invalido_DefesaNegativa);
+    RUN_TEST_CASE(CalcularDano, T05_Invalido_DefesaExcede);
+    RUN_TEST_CASE(CalcularDano, T06_Invalido_TipoZero);
+    RUN_TEST_CASE(CalcularDano, T07_Invalido_TipoExcede);
+    RUN_TEST_CASE(CalcularDano, T08_Invalido_CriticoNegativo);
+    RUN_TEST_CASE(CalcularDano, T09_Invalido_CriticoExcede);
+
+    /* --- Bloco 2: Classes Validas (PE) --- */
+    RUN_TEST_CASE(CalcularDano, T10_Fisico_Normal);
+    RUN_TEST_CASE(CalcularDano, T11_Fisico_Normal_DanoMinimo);
+    RUN_TEST_CASE(CalcularDano, T12_Fisico_Critico);
+    RUN_TEST_CASE(CalcularDano, T13_Fisico_Critico_DanoMinimo);
+    RUN_TEST_CASE(CalcularDano, T14_Magico_Normal);
+    RUN_TEST_CASE(CalcularDano, T15_Magico_Normal_DanoMinimo);
+    RUN_TEST_CASE(CalcularDano, T16_Magico_Critico);
+    RUN_TEST_CASE(CalcularDano, T17_Magico_Critico_DanoMinimo);
+    RUN_TEST_CASE(CalcularDano, T18_Verdadeiro_Normal);
+    RUN_TEST_CASE(CalcularDano, T19_Verdadeiro_Critico);
+
+    /* --- Bloco 3: BVA poder_ataque --- */
+    RUN_TEST_CASE(CalcularDano, T20_BVA_PoderMin_On);
+    RUN_TEST_CASE(CalcularDano, T21_BVA_PoderMin_Off);
+    RUN_TEST_CASE(CalcularDano, T22_BVA_PoderMax_On);
+    RUN_TEST_CASE(CalcularDano, T23_BVA_PoderMax_Off);
+
+    /* --- Bloco 4: BVA defesa --- */
+    RUN_TEST_CASE(CalcularDano, T24_BVA_DefesaMin_On);
+    RUN_TEST_CASE(CalcularDano, T25_BVA_DefesaMin_Off);
+    RUN_TEST_CASE(CalcularDano, T26_BVA_DefesaMax_On);
+    RUN_TEST_CASE(CalcularDano, T27_BVA_DefesaMax_Off);
+
+    /* --- Bloco 5: BVA tipo_ataque --- */
+    RUN_TEST_CASE(CalcularDano, T28_BVA_TipoMin_On);
+    RUN_TEST_CASE(CalcularDano, T29_BVA_TipoMin_Off);
+    RUN_TEST_CASE(CalcularDano, T30_BVA_TipoMax_On);
+    RUN_TEST_CASE(CalcularDano, T31_BVA_TipoMax_Off);
+
+    /* --- Bloco 6: BVA eh_critico --- */
+    RUN_TEST_CASE(CalcularDano, T32_BVA_CriticoMin_On);
+    RUN_TEST_CASE(CalcularDano, T33_BVA_CriticoMin_Off);
+    RUN_TEST_CASE(CalcularDano, T34_BVA_CriticoMax_On);
+    RUN_TEST_CASE(CalcularDano, T35_BVA_CriticoMax_Off);
+
+    /* --- Bloco 7: BVA fronteira dano minimo --- */
+    RUN_TEST_CASE(CalcularDano, T36_BVA_DanoMin_Fisico_On);
+    RUN_TEST_CASE(CalcularDano, T37_BVA_DanoMin_Fisico_Off);
+    RUN_TEST_CASE(CalcularDano, T38_BVA_DanoMin_Magico_On);
+    RUN_TEST_CASE(CalcularDano, T39_BVA_DanoMin_Magico_Off);
+    RUN_TEST_CASE(CalcularDano, T40_BVA_OrdemMin_Critico_Fisico);
+    RUN_TEST_CASE(CalcularDano, T41_BVA_OrdemMin_Critico_Magico);
+
+    /* --- Bloco 8: Casos adicionais --- */
+    RUN_TEST_CASE(CalcularDano, T42_Magico_DefesaImpar);
+    RUN_TEST_CASE(CalcularDano, T43_Magico_DefesaUm);
+    RUN_TEST_CASE(CalcularDano, T44_Verdadeiro_IgnoraDefesaMaxima);
+    RUN_TEST_CASE(CalcularDano, T45_Fisico_MaxMax_Critico);
+    RUN_TEST_CASE(CalcularDano, T46_Verdadeiro_PoderMax_Critico);
+    RUN_TEST_CASE(CalcularDano, T47_Magico_DefesaImpar_Critico);
+}
+\end{lstlisting}
+
+% =========================================================
+\section{Entregável 5 — Relatório de Execução e Defeitos Detectados}
+
+Cada versão defeituosa foi testada com a suíte de 47 casos. A Tabela~\ref{tab:defeitos} resume
+os testes que falham e o defeito identificado em cada versão.
+
+\begin{table}[H]
+\centering
+\caption{Defeitos identificados por versão após execução da suíte de testes.}
+\label{tab:defeitos}
+\begin{tabular}{@{}p{1.3cm}p{2.8cm}p{7.5cm}@{}}
+\toprule
+\textbf{Versão} & \textbf{Testes que falham} & \textbf{Defeito identificado} \\
+\midrule
+versao01 & T20, T44 &
+    \texttt{poder\_ataque} válido começa em 2. A validação usa \texttt{<= 1}
+    (deveria ser \texttt{< 1}), rejeitando \texttt{poder=1} como inválido. \\
+\midrule
+versao02 & T18, T19, T26, T44, T45 &
+    \texttt{defesa} máximo é 149. A validação usa \texttt{>= 150}
+    (deveria ser \texttt{> 150}), rejeitando \texttt{defesa=150} como inválido. \\
+\midrule
+versao03 & T14, T16, T42, T43, T47 &
+    Tipo mágico usa \texttt{poder - defesa} em vez de
+    \texttt{poder - floor(defesa / 2)} — a divisão por 2 está ausente. \\
+\midrule
+versao04 & T18, T19, T30, T46 &
+    Tipo verdadeiro (3) não ignora a \texttt{defesa}: aplica a fórmula do
+    físico (\texttt{poder - defesa}) em vez de retornar apenas \texttt{poder}. \\
+\midrule
+versao05 & T11, T13, T15, T17, T26, T36, T38, T40, T41, T45 &
+    Regra do dano mínimo ausente: a função retorna zero ou valor negativo
+    quando \texttt{dano\_base < 1}, em vez de forçar \texttt{dano = 1}. \\
+\midrule
+versao06 & T12, T13, T16, T17, T19, T34, T40, T41, T45, T46, T47 &
+    Multiplicador crítico é $\times 3$ em vez de $\times 2$: usa
+    \texttt{dano = dano * 3} na regra 4. \\
+\midrule
+versao07 & T18, T19, T30, T44, T46 &
+    \texttt{tipo\_ataque} máximo é 2. A validação usa \texttt{> 2}
+    (deveria ser \texttt{> 3}), rejeitando \texttt{tipo=3} como inválido. \\
+\midrule
+versao08 & T20, T22, T24 &
+    \texttt{defesa} mínimo é 1. A validação usa \texttt{<= 0}
+    (deveria ser \texttt{< 0}), rejeitando \texttt{defesa=0} como inválido. \\
+\midrule
+versao09 & T13, T17, T40, T41, T45 &
+    Regras 3 e 4 em ordem invertida: o crítico é aplicado \textit{antes} do
+    dano mínimo. Assim \texttt{dano\_base=0} $\times 2 = 0 \to \text{mín} = 1$
+    em vez de \texttt{mín=1} $\times 2 = 2$. \\
+\midrule
+versao10 & T08, T09, T33, T35 &
+    Validação de \texttt{eh\_critico} ausente: valores inválidos ($-1$ e $2$)
+    não retornam $-1$, sendo tratados como entradas válidas. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Discussão dos Resultados}
+
+A suíte de 47 casos detectou defeitos em todas as 10 versões fornecidas, sem falsos positivos
+na versão de referência (\texttt{correto.o}). Os aspectos mais relevantes observados são:
+
+\begin{itemize}
+    \item \textbf{Erros de operador relacional na validação (versões 01, 02, 07, 08):}
+    Troca de \texttt{<} por \texttt{<=} (ou \texttt{>} por \texttt{>=}) nos limites de
+    validade. Os casos BVA \textit{on-boundary} foram essenciais para detectá-los, pois
+    testam exatamente o valor-limite válido que foi erroneamente rejeitado.
+
+    \item \textbf{Fórmula incorreta de dano mágico (versão 03):}
+    A ausência da divisão por 2 é detectada pelos casos com defesa par (T14, T16) e
+    pelos casos adicionais com defesa ímpar (T42, T43, T47) que distinguem
+    $\lfloor\texttt{def}/2\rfloor$ de $\texttt{def}$.
+
+    \item \textbf{Tipo verdadeiro não ignora defesa (versão 04):}
+    Os casos T18/T19 (com \texttt{defesa=150}) e T30/T46 revelam o defeito ao
+    comparar o resultado esperado quando a defesa deveria ser ignorada.
+
+    \item \textbf{Ausência do dano mínimo (versão 05):}
+    Um conjunto amplo de casos com \texttt{dano\_base $\leq 0$} é necessário para cobrir
+    esta situação nos três tipos de ataque.
+
+    \item \textbf{Multiplicador incorreto (versão 06):}
+    Os casos com crítico onde o resultado esperado é par e exato (ex.: $140$, $160$,
+    $300$) detectam facilmente o uso de $\times 3$.
+
+    \item \textbf{Ordem das regras invertida (versão 09):}
+    Os casos T40 e T41 foram projetados especificamente para discriminar a ordem
+    correta (mínimo antes do crítico): com \texttt{dano\_base=0} e
+    \texttt{eh\_critico=1}, o resultado correto é 2 — mas a ordem invertida produziria
+    $0 \times 2 = 0 \to \text{mín} = 1$.
+
+    \item \textbf{Ausência de validação do crítico (versão 10):}
+    Os casos BVA \textit{off-boundary} T08, T09, T33 e T35 testam diretamente os
+    valores inválidos $-1$ e $2$, garantindo que ambos retornem $-1$.
+\end{itemize}
+
+% =========================================================
+\section*{Conclusão}
+
+O trabalho demonstrou a efetividade das técnicas PE e BVA no projeto de testes funcionais
+de caixa-preta. A combinação das duas abordagens gerou uma suíte enxuta (47 casos) com
+alta cobertura de defeitos: todos os 10 defeitos injetados foram detectados, com zero
+falsos positivos. Os testes de fronteira (BVA) foram determinantes para revelar erros de
+operador relacional, enquanto os casos de equivalência válida cobriram as combinações
+lógicas das regras de negócio. Os casos adicionais do Bloco 8 provaram ser essenciais para
+distinguir defeitos sutis (fórmula mágica, ordem das regras).
+
+\end{document}
